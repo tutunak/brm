@@ -141,8 +141,10 @@ func handleOpinionCommand(c tele.Context) error {
 
     // Check if we've already processed this message
     messageID := c.Message().ReplyTo.ID
+    userID := c.Sender().ID
     ctx := context.Background()
     
+    alreadyProcessed := false
     if redisClient != nil {
         cacheKey := fmt.Sprintf("opinion:%d:%d", c.Chat().ID, messageID)
         exists, err := redisClient.Exists(ctx, cacheKey).Result()
@@ -152,8 +154,38 @@ func handleOpinionCommand(c tele.Context) error {
                 "chat":       getChatInfo(c),
                 "message_id": messageID,
             })
+            alreadyProcessed = true
             return c.Reply("I've already answered, try to use search")
         }
+    }
+    
+    // Rate limiting: only apply to NEW messages (not already processed)
+    if !alreadyProcessed && redisClient != nil {
+        rateLimitKey := fmt.Sprintf("ratelimit:%d", userID)
+        now := time.Now()
+        twoDaysAgo := now.Add(-48 * time.Hour)
+        
+        // Remove old entries (older than 2 days)
+        redisClient.ZRemRangeByScore(ctx, rateLimitKey, "0", fmt.Sprintf("%d", twoDaysAgo.Unix()))
+        
+        // Count recent attempts
+        count, err := redisClient.ZCount(ctx, rateLimitKey, fmt.Sprintf("%d", twoDaysAgo.Unix()), "+inf").Result()
+        if err == nil && count >= 5 {
+            logJSON("warn", "Rate limit exceeded", map[string]interface{}{
+                "user":  getUserInfo(c),
+                "chat":  getChatInfo(c),
+                "count": count,
+            })
+            return c.Reply("⚠️ You've reached the limit of 5 opinions per 2 days for new messages. Already analyzed messages can still be searched.")
+        }
+        
+        // Add current attempt to rate limit tracking
+        redisClient.ZAdd(ctx, rateLimitKey, redis.Z{
+            Score:  float64(now.Unix()),
+            Member: fmt.Sprintf("%d:%d", c.Chat().ID, messageID),
+        })
+        // Set expiration to 2 days
+        redisClient.Expire(ctx, rateLimitKey, 48*time.Hour)
     }
     
     // Get the text from the replied message
