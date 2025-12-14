@@ -137,7 +137,8 @@ func handleOpinionCommand(c tele.Context) error {
 
     // Reply to the original message with the opinion
     return c.Send(opinion, &tele.SendOptions{
-        ReplyTo: c.Message().ReplyTo,
+        ReplyTo:           c.Message().ReplyTo,
+        DisableWebPagePreview: true,
     })
 }
 
