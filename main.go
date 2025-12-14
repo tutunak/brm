@@ -1,6 +1,7 @@
 package main
 
 import (
+    "fmt"
     "log"
     "os"
     "time"
@@ -106,7 +107,7 @@ func getUserInfo(c tele.Context) string {
         firstName = "Unknown"
     }
     
-    return user.Username + " (" + firstName + ", ID: " + string(rune(user.ID)) + ")"
+    return fmt.Sprintf("%s (%s, ID: %d)", username, firstName, user.ID)
 }
 
 // getChatInfo returns formatted chat information
@@ -130,5 +131,5 @@ func getChatInfo(c tele.Context) string {
         }
     }
     
-    return chatTitle + " (" + chatType + ", ID: " + string(rune(chat.ID)) + ")"
+    return fmt.Sprintf("%s (%s, ID: %d)", chatTitle, chatType, chat.ID)
 }
