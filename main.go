@@ -106,16 +106,6 @@ func main() {
         return handleOpinionCommand(c)
     })
 
-    // Handle unknown commands
-    bot.Handle(tele.OnText, func(c tele.Context) error {
-        // Only respond to other commands, not regular text
-        if c.Message().Text != "" && c.Message().Text[0] == '/' {
-            logRequest(c, "unknown_command")
-            return c.Reply("Unknown command. Available commands: /opinion")
-        }
-        return nil
-    })
-
     logJSON("info", "Bot is running and waiting for messages", nil)
     bot.Start()
 }
