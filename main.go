@@ -21,13 +21,15 @@ func main() {
 
     botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
     if botToken == "" {
-        log.Fatal("TELEGRAM_BOT_TOKEN environment variable is required")
+        logFatal("TELEGRAM_BOT_TOKEN environment variable is required", nil)
     }
 
     // Load allowed chat IDs
     allowedChatsStr := os.Getenv("ALLOWED_CHAT_IDS")
     if allowedChatsStr == "" {
-        log.Fatal("ALLOWED_CHAT_IDS environment variable is required (comma-separated list of chat IDs)")
+        logFatal("ALLOWED_CHAT_IDS environment variable is required", map[string]interface{}{
+            "hint": "Provide comma-separated list of chat IDs",
+        })
     }
 
     groupLink := os.Getenv("GROUP_LINK")
@@ -48,7 +50,9 @@ func main() {
 
     bot, err := tele.NewBot(pref)
     if err != nil {
-        log.Fatal(err)
+        logFatal("Failed to create bot", map[string]interface{}{
+            "error": err.Error(),
+        })
     }
 
     logJSON("info", "Bot started successfully", map[string]interface{}{
@@ -168,6 +172,29 @@ func logJSON(level string, message string, data map[string]interface{}) {
     }
     
     fmt.Println(string(jsonBytes))
+}
+
+// logFatal outputs structured JSON fatal log and exits the program
+func logFatal(message string, data map[string]interface{}) {
+    logEntry := map[string]interface{}{
+        "timestamp": time.Now().Format(time.RFC3339),
+        "level":     "fatal",
+        "message":   message,
+    }
+    
+    if data != nil {
+        for k, v := range data {
+            logEntry[k] = v
+        }
+    }
+    
+    jsonBytes, err := json.Marshal(logEntry)
+    if err != nil {
+        log.Fatalf("Error marshaling fatal log: %v", err)
+    }
+    
+    fmt.Println(string(jsonBytes))
+    os.Exit(1)
 }
 
 // parseAllowedChatIDs parses comma-separated chat IDs from environment variable
