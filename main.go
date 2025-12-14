@@ -234,18 +234,32 @@ func handleOpinionCommand(c tele.Context) error {
     // Reply logic:
     // - If success (new answer with URL processed) -> reply to original message
     // - If not success (no URL or error) -> reply to command message
+    
+    logJSON("debug", "Preparing to send reply", map[string]interface{}{
+        "success":         success,
+        "opinion_length":  len(opinion),
+        "opinion_preview": truncateString(opinion, 100),
+    })
+    
     if success {
         logJSON("success", "Replying to original message", map[string]interface{}{
             "user":               getUserInfo(c),
             "chat":               getChatInfo(c),
             "original_msg_id":    c.Message().ReplyTo.ID,
             "command_msg_id":     c.Message().ID,
+            "chat_id":            c.Chat().ID,
         })
-        // Success: reply to the original message
-        return c.Send(opinion, &tele.SendOptions{
+        // Success: reply to the original message (the one with URL)
+        _, err := c.Bot().Send(c.Chat(), opinion, &tele.SendOptions{
             ReplyTo:               c.Message().ReplyTo,
             DisableWebPagePreview: true,
         })
+        if err != nil {
+            logJSON("error", "Failed to reply to original message", map[string]interface{}{
+                "error": err.Error(),
+            })
+        }
+        return err
     } else {
         logJSON("info", "Replying to command message", map[string]interface{}{
             "user":           getUserInfo(c),
@@ -253,8 +267,7 @@ func handleOpinionCommand(c tele.Context) error {
             "command_msg_id": c.Message().ID,
         })
         // Error or no URL: reply to the command message
-        return c.Send(opinion, &tele.SendOptions{
-            ReplyTo:               c.Message(),
+        return c.Reply(opinion, &tele.SendOptions{
             DisableWebPagePreview: true,
         })
     }
