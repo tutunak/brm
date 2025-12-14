@@ -52,6 +52,12 @@ func main() {
         logFatal("TELEGRAM_BOT_TOKEN environment variable is required", nil)
     }
 
+    // Load Google API key for LLM
+    googleAPIKey = os.Getenv("GOOGLE_API_KEY")
+    if googleAPIKey == "" {
+        logJSON("warn", "GOOGLE_API_KEY not set, URL analysis will be disabled", nil)
+    }
+
     // Load allowed chat IDs
     allowedChatsStr := os.Getenv("ALLOWED_CHAT_IDS")
     if allowedChatsStr == "" {

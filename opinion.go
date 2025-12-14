@@ -40,9 +40,13 @@ func extractURL(text string) string {
 
 // processURL processes the URL (currently does nothing)
 func processURL(url string) string {
-	// TODO: Implement URL processing logic
-	// For now, return a placeholder message
-	return fmt.Sprintf("🔗 Processing URL: %s\n\nAnalysis coming soon...", url)
+	// Call the LLM to analyze the URL
+	analysis, err := analyzeURLWithLLM(url)
+	if err != nil {
+		return fmt.Sprintf("❌ Failed to analyze URL: %v", err)
+	}
+	
+	return analysis
 }
 
 // getRandomRefusalResponse returns a random refusal/angry response
