@@ -1,16 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"regexp"
 	"time"
 )
 
 // getOpinion analyzes a message and returns an opinion about it
-func getOpinion(text string) string {
+// Returns the opinion and a boolean indicating if processing was successful
+func getOpinion(text string) (string, bool) {
 	if text == "" {
-		return "No text to analyze."
+		return "No text to analyze.", false
 	}
 
 	// Extract URL from the message
@@ -18,7 +18,7 @@ func getOpinion(text string) string {
 	
 	if url == "" {
 		// No URL found - return random angry/tired response
-		return getRandomRefusalResponse()
+		return getRandomRefusalResponse(), false
 	}
 	
 	// URL found - process it
@@ -39,14 +39,14 @@ func extractURL(text string) string {
 }
 
 // processURL processes the URL (currently does nothing)
-func processURL(url string) string {
+func processURL(url string) (string, bool) {
 	// Call the LLM to analyze the URL
 	analysis, err := analyzeURLWithLLM(url)
 	if err != nil {
-		return fmt.Sprintf("❌ Failed to analyze URL: %v", err)
+		return "I'm tired dude, next time 😴", false
 	}
 	
-	return analysis
+	return analysis, true
 }
 
 // getRandomRefusalResponse returns a random refusal/angry response
