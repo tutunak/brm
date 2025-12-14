@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"math/rand"
+	"regexp"
+	"time"
 )
 
 // getOpinion analyzes a message and returns an opinion about it
@@ -11,40 +13,57 @@ func getOpinion(text string) string {
 		return "No text to analyze."
 	}
 
-	// Simple sentiment analysis based on keywords
-	text = strings.ToLower(text)
+	// Extract URL from the message
+	url := extractURL(text)
 	
-	positiveWords := []string{"good", "great", "excellent", "wonderful", "amazing", "love", "awesome", "fantastic", "perfect", "happy", "best"}
-	negativeWords := []string{"bad", "terrible", "awful", "horrible", "hate", "worst", "poor", "sad", "angry", "disappointed"}
-	
-	positiveCount := 0
-	negativeCount := 0
-	
-	for _, word := range positiveWords {
-		positiveCount += strings.Count(text, word)
+	if url == "" {
+		// No URL found - return random angry/tired response
+		return getRandomRefusalResponse()
 	}
 	
-	for _, word := range negativeWords {
-		negativeCount += strings.Count(text, word)
+	// URL found - process it
+	return processURL(url)
+}
+
+// extractURL extracts the first URL from the text
+func extractURL(text string) string {
+	// Regex to match URLs
+	urlRegex := regexp.MustCompile(`https?://[^\s]+`)
+	matches := urlRegex.FindStringSubmatch(text)
+	
+	if len(matches) > 0 {
+		return matches[0]
 	}
 	
-	wordCount := len(strings.Fields(text))
-	
-	var sentiment string
-	if positiveCount > negativeCount {
-		sentiment = "positive 😊"
-	} else if negativeCount > positiveCount {
-		sentiment = "negative 😔"
-	} else {
-		sentiment = "neutral 😐"
+	return ""
+}
+
+// processURL processes the URL (currently does nothing)
+func processURL(url string) string {
+	// TODO: Implement URL processing logic
+	// For now, return a placeholder message
+	return fmt.Sprintf("🔗 Processing URL: %s\n\nAnalysis coming soon...", url)
+}
+
+// getRandomRefusalResponse returns a random refusal/angry response
+func getRandomRefusalResponse() string {
+	responses := []string{
+		"I'm tired 😴",
+		"I don't want to talk 😤",
+		"NO 😠",
+		"Not today 😑",
+		"Leave me alone 🙄",
+		"I'm not in the mood 😒",
+		"Go away 😡",
+		"Seriously? 🤨",
+		"Don't bother me 💢",
+		"Ask someone else 😾",
+		"I refuse 🚫",
+		"Absolutely not 😤",
 	}
 	
-	opinion := fmt.Sprintf("📊 Opinion Analysis:\n\n"+
-		"Sentiment: %s\n"+
-		"Word count: %d\n"+
-		"Positive indicators: %d\n"+
-		"Negative indicators: %d",
-		sentiment, wordCount, positiveCount, negativeCount)
+	// Seed random number generator
+	rand.Seed(time.Now().UnixNano())
 	
-	return opinion
+	return responses[rand.Intn(len(responses))]
 }
