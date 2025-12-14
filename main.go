@@ -66,9 +66,15 @@ func main() {
     }
 
     allowedChatIDs := parseAllowedChatIDs(allowedChatsStr)
-    logJSON("info", "Allowed chat IDs loaded", map[string]interface{}{
-        "allowed_chats": allowedChatIDs,
-        "group_link":    groupLink,
+    
+    // Load excluded user IDs (users who bypass rate limiting)
+    excludedUsersStr := os.Getenv("EXCLUDED_USER_IDS")
+    excludedUserIDs := parseExcludedUserIDs(excludedUsersStr)
+    
+    logJSON("info", "Configuration loaded", map[string]interface{}{
+        "allowed_chats":   allowedChatIDs,
+        "excluded_users":  excludedUserIDs,
+        "group_link":      groupLink,
     })
 
     pref := tele.Settings{
@@ -159,8 +165,8 @@ func handleOpinionCommand(c tele.Context) error {
         }
     }
     
-    // Rate limiting: only apply to NEW messages (not already processed)
-    if !alreadyProcessed && redisClient != nil {
+    // Rate limiting: only apply to NEW messages (not already processed) and non-excluded users
+    if !alreadyProcessed && redisClient != nil && !isExcludedUser(userID) {
         rateLimitKey := fmt.Sprintf("ratelimit:%d", userID)
         now := time.Now()
         twoDaysAgo := now.Add(-48 * time.Hour)
@@ -352,6 +358,47 @@ func getUserInfo(c tele.Context) map[string]interface{} {
         "first_name": firstName,
         "user_id":    user.ID,
     }
+}
+
+// parseExcludedUserIDs parses comma-separated user IDs from environment variable
+func parseExcludedUserIDs(usersStr string) []int64 {
+    if usersStr == "" {
+        return []int64{}
+    }
+    
+    parts := strings.Split(usersStr, ",")
+    var userIDs []int64
+    
+    for _, part := range parts {
+        part = strings.TrimSpace(part)
+        if part == "" {
+            continue
+        }
+        
+        userID, err := strconv.ParseInt(part, 10, 64)
+        if err != nil {
+            log.Printf("Warning: invalid excluded user ID '%s': %v", part, err)
+            continue
+        }
+        
+        userIDs = append(userIDs, userID)
+    }
+    
+    return userIDs
+}
+
+// isExcludedUser checks if the user is in the excluded list (bypasses rate limiting)
+func isExcludedUser(userID int64) bool {
+    excludedUsersStr := os.Getenv("EXCLUDED_USER_IDS")
+    excludedUserIDs := parseExcludedUserIDs(excludedUsersStr)
+    
+    for _, excludedID := range excludedUserIDs {
+        if userID == excludedID {
+            return true
+        }
+    }
+    
+    return false
 }
 
 // getChatInfo returns formatted chat information
