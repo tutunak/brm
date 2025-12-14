@@ -3,9 +3,10 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
+	tele "gopkg.in/telebot.v3"
 )
 
 func main() {
@@ -19,64 +20,53 @@ func main() {
 		log.Fatal("TELEGRAM_BOT_TOKEN environment variable is required")
 	}
 
-	bot, err := tgbotapi.NewBotAPI(botToken)
+	pref := tele.Settings{
+		Token:  botToken,
+		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
+	}
+
+	bot, err := tele.NewBot(pref)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("Authorized on account %s", bot.Self.UserName)
+	log.Printf("Authorized on account %s", bot.Me.Username)
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
+	// Handle /opinion command
+	bot.Handle("/opinion", func(c tele.Context) error {
+		return handleOpinionCommand(c)
+	})
 
-	updates := bot.GetUpdatesChan(u)
-
-	for update := range updates {
-		if update.Message == nil {
-			continue
+	// Handle unknown commands
+	bot.Handle(tele.OnText, func(c tele.Context) error {
+		// Only respond to other commands, not regular text
+		if c.Message().Text != "" && c.Message().Text[0] == '/' {
+			return c.Reply("Unknown command. Available commands: /opinion")
 		}
+		return nil
+	})
 
-		// Check if the message is a command
-		if update.Message.IsCommand() {
-			handleCommand(bot, update.Message)
-		}
-	}
+	log.Println("Bot is running...")
+	bot.Start()
 }
 
-func handleCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-	switch message.Command() {
-	case "opinion":
-		handleOpinionCommand(bot, message)
-	default:
-		msg := tgbotapi.NewMessage(message.Chat.ID, "Unknown command. Available commands: /opinion")
-		msg.ReplyToMessageID = message.MessageID
-		bot.Send(msg)
-	}
-}
-
-func handleOpinionCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+func handleOpinionCommand(c tele.Context) error {
 	// Check if this is a reply to another message
-	if message.ReplyToMessage == nil {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "Please use /opinion as a reply to a message")
-		msg.ReplyToMessageID = message.MessageID
-		bot.Send(msg)
-		return
+	if c.Message().ReplyTo == nil {
+		return c.Reply("Please use /opinion as a reply to a message")
 	}
 
 	// Get the text from the replied message
-	originalText := message.ReplyToMessage.Text
+	originalText := c.Message().ReplyTo.Text
 	if originalText == "" {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "The replied message has no text to analyze")
-		msg.ReplyToMessageID = message.MessageID
-		bot.Send(msg)
-		return
+		return c.Reply("The replied message has no text to analyze")
 	}
 
 	// Process the message through the opinion function
 	opinion := getOpinion(originalText)
 
 	// Reply to the original message with the opinion
-	msg := tgbotapi.NewMessage(message.Chat.ID, opinion)
-	msg.ReplyToMessageID = message.ReplyToMessage.MessageID
-	bot.Send(msg)
+	return c.Send(opinion, &tele.SendOptions{
+		ReplyTo: c.Message().ReplyTo,
+	})
 }
