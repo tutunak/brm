@@ -3,23 +3,72 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
 	"google.golang.org/genai"
 )
 
-var llmModel = "gemini-3-pro-preview"
+var llmModel = "gemini-flash-latest"
 var googleAPIKey string
+
+// Prompt types with their probabilities
+type PromptType string
+
+const (
+	PromptBullshit PromptType = "bullshit" // 10%
+	PromptPositive PromptType = "positive" // 40%
+	PromptNegative PromptType = "negative" // 40%
+)
+
+// Base prompts for different tones
+var basePrompts = map[PromptType]string{
+	PromptBullshit: "Write a short summary why the text provided by a link is a bullshit. Don't write introduction or something else, just answer. If it's a github project - analyze it, and provide based arguments why it's a bullshit. Keep the answer short and funny.",
+	PromptPositive: "Write a short summary with positive and well-argumented feedback about the content provided by a link. Don't write introduction, just answer. If it's a github project - analyze it and highlight the good aspects with solid arguments. Keep the answer short and encouraging.",
+	PromptNegative: "Write a short summary with argumented criticism about why the content provided by a link is not good. Don't write introduction, just answer. If it's a github project - analyze it and provide solid arguments about its weaknesses. Keep the answer short and constructive but critical.",
+}
+
+// Video handling prompts for different tones
+var videoPrompts = map[PromptType]string{
+	PromptBullshit: " If it's a video - don't think long and answer that you will not watch such bullshit (make the answer random and creative each time).",
+	PromptPositive: " If it's a video - politely explain that you can't watch videos but you're sure it must be interesting content.",
+	PromptNegative: " If it's a video - rudely refuse to watch it and make a sarcastic comment about people who share videos instead of text.",
+}
+
+// selectPromptType randomly selects a prompt type based on probabilities
+func selectPromptType() PromptType {
+	r := rand.Float64() * 100
+	
+	if r < 10 {
+		return PromptBullshit // 10%
+	} else if r < 50 {
+		return PromptPositive // 40% (10-50)
+	} else {
+		return PromptNegative // 40% (50-90) + remaining 10% = 50%
+	}
+}
+
+// buildPrompt constructs the full prompt based on type
+func buildPrompt(promptType PromptType) string {
+	base := basePrompts[promptType]
+	video := videoPrompts[promptType]
+	return base + video
+}
 
 // analyzeURLWithLLM sends the URL to the LLM and returns the analysis
 func analyzeURLWithLLM(url string) (string, error) {
 	ctx := context.Background()
 	startTime := time.Now()
 
+	// Select prompt type based on probability
+	promptType := selectPromptType()
+	prompt := buildPrompt(promptType)
+
 	logJSON("info", "Starting LLM analysis", map[string]interface{}{
-		"url":   url,
-		"model": llmModel,
+		"url":         url,
+		"model":       llmModel,
+		"prompt_type": string(promptType),
 	})
 
 	if googleAPIKey == "" {
@@ -64,15 +113,16 @@ func analyzeURLWithLLM(url string) (string, error) {
 		Tools: tools,
 		SystemInstruction: &genai.Content{
 			Parts: []*genai.Part{
-				genai.NewPartFromText("Write a short summary why the text provided by a link is a bullshit. Don't pass inroduction or something else, just answer started with. This is a bullshit because <your answer>"),
+				genai.NewPartFromText(prompt),
 			},
 		},
 	}
 
 	logJSON("debug", "Starting LLM stream request", map[string]interface{}{
-		"model":          llmModel,
+		"model":           llmModel,
 		"thinking_budget": 1024,
-		"tools_count":    len(tools),
+		"tools_count":     len(tools),
+		"prompt_type":     string(promptType),
 	})
 
 	var result strings.Builder
