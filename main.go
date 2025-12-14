@@ -217,13 +217,10 @@ func handleOpinionCommand(c tele.Context) error {
     })
 
     // Process the message through the opinion function
-    opinion := getOpinion(originalText)
-    
-    // Check if URL was found in the message
-    hasURL := extractURL(originalText) != ""
+    opinion, success := getOpinion(originalText)
 
-    // Store in Redis that we've processed this message (only if URL was found)
-    if hasURL && redisClient != nil {
+    // Store in Redis that we've processed this message (only if successful)
+    if success && redisClient != nil {
         cacheKey := fmt.Sprintf("opinion:%d:%d", c.Chat().ID, messageID)
         // Store for 30 days
         err := redisClient.Set(ctx, cacheKey, time.Now().Unix(), 30*24*time.Hour).Err()
@@ -239,9 +236,9 @@ func handleOpinionCommand(c tele.Context) error {
         "chat": getChatInfo(c),
     })
 
-    // Reply to the original message if URL found, otherwise reply to command message
+    // Reply to the original message if successful, otherwise reply to command message
     replyTo := c.Message().ReplyTo
-    if !hasURL {
+    if !success {
         replyTo = c.Message()
     }
     
