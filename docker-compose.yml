@@ -3,10 +3,10 @@ version: '3.8'
 services:
   valkey:
     image: docker.io/valkey/valkey:9.0.1
-    container_name: valkey
+    container_name: brm-valkey
     restart: unless-stopped
     ports:
-      - "0.0.0.0:6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - valkey-data:/data
     command: >
@@ -25,6 +25,32 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+    networks:
+      - brm-network
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: brm-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - ALLOWED_CHAT_IDS=${ALLOWED_CHAT_IDS}
+      - GROUP_LINK=${GROUP_LINK}
+      - EXCLUDED_USER_IDS=${EXCLUDED_USER_IDS:-}
+      - REDIS_ADDR=valkey:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    depends_on:
+      valkey:
+        condition: service_healthy
+    networks:
+      - brm-network
+
+networks:
+  brm-network:
+    driver: bridge
 
 volumes:
   valkey-data:
