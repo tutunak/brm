@@ -231,21 +231,33 @@ func handleOpinionCommand(c tele.Context) error {
         }
     }
 
-    logJSON("success", "Opinion sent successfully", map[string]interface{}{
-        "user": getUserInfo(c),
-        "chat": getChatInfo(c),
-    })
-
-    // Reply to the original message if successful, otherwise reply to command message
-    replyTo := c.Message().ReplyTo
-    if !success {
-        replyTo = c.Message()
+    // Reply logic:
+    // - If success (new answer with URL processed) -> reply to original message
+    // - If not success (no URL or error) -> reply to command message
+    if success {
+        logJSON("success", "Replying to original message", map[string]interface{}{
+            "user":               getUserInfo(c),
+            "chat":               getChatInfo(c),
+            "original_msg_id":    c.Message().ReplyTo.ID,
+            "command_msg_id":     c.Message().ID,
+        })
+        // Success: reply to the original message
+        return c.Send(opinion, &tele.SendOptions{
+            ReplyTo:               c.Message().ReplyTo,
+            DisableWebPagePreview: true,
+        })
+    } else {
+        logJSON("info", "Replying to command message", map[string]interface{}{
+            "user":           getUserInfo(c),
+            "chat":           getChatInfo(c),
+            "command_msg_id": c.Message().ID,
+        })
+        // Error or no URL: reply to the command message
+        return c.Send(opinion, &tele.SendOptions{
+            ReplyTo:               c.Message(),
+            DisableWebPagePreview: true,
+        })
     }
-    
-    return c.Send(opinion, &tele.SendOptions{
-        ReplyTo:           replyTo,
-        DisableWebPagePreview: true,
-    })
 }
 
 // logRequest logs information about incoming requests
