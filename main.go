@@ -1,6 +1,7 @@
 package main
 
 import (
+    "context"
     "encoding/json"
     "fmt"
     "log"
@@ -10,13 +11,40 @@ import (
     "time"
 
     "github.com/joho/godotenv"
+    "github.com/redis/go-redis/v9"
     tele "gopkg.in/telebot.v3"
 )
+
+var redisClient *redis.Client
 
 func main() {
     // Load environment variables
     if err := godotenv.Load(); err != nil {
         logJSON("info", "No .env file found, using system environment variables", nil)
+    }
+
+    // Initialize Redis client
+    redisAddr := os.Getenv("REDIS_ADDR")
+    if redisAddr == "" {
+        redisAddr = "localhost:6379"
+    }
+    
+    redisClient = redis.NewClient(&redis.Options{
+        Addr:     redisAddr,
+        Password: os.Getenv("REDIS_PASSWORD"),
+        DB:       0,
+    })
+    
+    ctx := context.Background()
+    if err := redisClient.Ping(ctx).Err(); err != nil {
+        logJSON("warn", "Redis connection failed, continuing without cache", map[string]interface{}{
+            "error": err.Error(),
+        })
+        redisClient = nil
+    } else {
+        logJSON("info", "Redis connected successfully", map[string]interface{}{
+            "address": redisAddr,
+        })
     }
 
     botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
@@ -111,6 +139,23 @@ func handleOpinionCommand(c tele.Context) error {
         return c.Reply("Please use /opinion as a reply to a message")
     }
 
+    // Check if we've already processed this message
+    messageID := c.Message().ReplyTo.ID
+    ctx := context.Background()
+    
+    if redisClient != nil {
+        cacheKey := fmt.Sprintf("opinion:%d:%d", c.Chat().ID, messageID)
+        exists, err := redisClient.Exists(ctx, cacheKey).Result()
+        if err == nil && exists > 0 {
+            logJSON("info", "Duplicate opinion request detected", map[string]interface{}{
+                "user":       getUserInfo(c),
+                "chat":       getChatInfo(c),
+                "message_id": messageID,
+            })
+            return c.Reply("I've already answered, try to use search")
+        }
+    }
+    
     // Get the text from the replied message
     originalText := c.Message().ReplyTo.Text
     if originalText == "" {
@@ -129,6 +174,18 @@ func handleOpinionCommand(c tele.Context) error {
 
     // Process the message through the opinion function
     opinion := getOpinion(originalText)
+
+    // Store in Redis that we've processed this message
+    if redisClient != nil {
+        cacheKey := fmt.Sprintf("opinion:%d:%d", c.Chat().ID, messageID)
+        // Store for 30 days
+        err := redisClient.Set(ctx, cacheKey, time.Now().Unix(), 30*24*time.Hour).Err()
+        if err != nil {
+            logJSON("warn", "Failed to cache opinion result", map[string]interface{}{
+                "error": err.Error(),
+            })
+        }
+    }
 
     logJSON("success", "Opinion sent successfully", map[string]interface{}{
         "user": getUserInfo(c),
