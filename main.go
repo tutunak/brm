@@ -165,13 +165,13 @@ func handleOpinionCommand(c tele.Context) error {
     if !alreadyProcessed && redisClient != nil && !isExcludedUser(userID) {
         rateLimitKey := fmt.Sprintf("ratelimit:%d", userID)
         now := time.Now()
-        twoDaysAgo := now.Add(-24 * time.Hour)
+        timeRange := now.Add(-24 * time.Hour)
         
-        // Remove old entries (older than 2 days)
-        redisClient.ZRemRangeByScore(ctx, rateLimitKey, "0", fmt.Sprintf("%d", twoDaysAgo.Unix()))
+        // Remove old entries (older than timeRange)
+        redisClient.ZRemRangeByScore(ctx, rateLimitKey, "0", fmt.Sprintf("%d", timeRange.Unix()))
         
         // Count recent attempts
-        count, err := redisClient.ZCount(ctx, rateLimitKey, fmt.Sprintf("%d", twoDaysAgo.Unix()), "+inf").Result()
+        count, err := redisClient.ZCount(ctx, rateLimitKey, fmt.Sprintf("%d", timeRange.Unix()), "+inf").Result()
         if err == nil && count >= 5 {
             logJSON("warn", "Rate limit exceeded", map[string]interface{}{
                 "user":  getUserInfo(c),
