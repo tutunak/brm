@@ -384,3 +384,450 @@ func TestGetOpinionIntegration(t *testing.T) {
 		})
 	}
 }
+
+// TestTrimTrailingPunctuation tests the trimTrailingPunctuation function
+func TestTrimTrailingPunctuation(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "No trailing punctuation",
+			input:    "https://example.com",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing period",
+			input:    "https://example.com.",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing comma",
+			input:    "https://example.com,",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing closing parenthesis",
+			input:    "https://example.com)",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing closing bracket",
+			input:    "https://example.com]",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing closing brace",
+			input:    "https://example.com}",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing semicolon",
+			input:    "https://example.com;",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing exclamation mark",
+			input:    "https://example.com!",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing question mark",
+			input:    "https://example.com?",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Trailing colon",
+			input:    "https://example.com:",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Multiple trailing punctuation",
+			input:    "https://example.com.)!",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Mixed trailing punctuation",
+			input:    "https://example.com!?.",
+			expected: "https://example.com",
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "Only punctuation",
+			input:    ".,!?",
+			expected: "",
+		},
+		{
+			name:     "URL with query parameter ending with valid char",
+			input:    "https://example.com/path?foo=bar",
+			expected: "https://example.com/path?foo=bar",
+		},
+		{
+			name:     "URL with fragment",
+			input:    "https://example.com/path#section",
+			expected: "https://example.com/path#section",
+		},
+		{
+			name:     "URL with path ending in slash",
+			input:    "https://example.com/path/",
+			expected: "https://example.com/path/",
+		},
+		{
+			name:     "URL with port",
+			input:    "https://example.com:8080",
+			expected: "https://example.com:8080",
+		},
+		{
+			name:     "All punctuation chars sequentially",
+			input:    "test.,)];!?:",
+			expected: "test",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := trimTrailingPunctuation(tt.input)
+			if result != tt.expected {
+				t.Errorf("trimTrailingPunctuation(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestContainsChar tests the containsChar function
+func TestContainsChar(t *testing.T) {
+	tests := []struct {
+		name     string
+		s        string
+		c        byte
+		expected bool
+	}{
+		{
+			name:     "Character present at start",
+			s:        "abc",
+			c:        'a',
+			expected: true,
+		},
+		{
+			name:     "Character present in middle",
+			s:        "abc",
+			c:        'b',
+			expected: true,
+		},
+		{
+			name:     "Character present at end",
+			s:        "abc",
+			c:        'c',
+			expected: true,
+		},
+		{
+			name:     "Character not present",
+			s:        "abc",
+			c:        'd',
+			expected: false,
+		},
+		{
+			name:     "Empty string",
+			s:        "",
+			c:        'a',
+			expected: false,
+		},
+		{
+			name:     "Single character string - match",
+			s:        "a",
+			c:        'a',
+			expected: true,
+		},
+		{
+			name:     "Single character string - no match",
+			s:        "a",
+			c:        'b',
+			expected: false,
+		},
+		{
+			name:     "Punctuation character present",
+			s:        ".,!?",
+			c:        '.',
+			expected: true,
+		},
+		{
+			name:     "Punctuation character not present",
+			s:        ".,!?",
+			c:        ';',
+			expected: false,
+		},
+		{
+			name:     "Space character",
+			s:        "hello world",
+			c:        ' ',
+			expected: true,
+		},
+		{
+			name:     "Newline character",
+			s:        "hello\nworld",
+			c:        '\n',
+			expected: true,
+		},
+		{
+			name:     "Tab character",
+			s:        "hello\tworld",
+			c:        '\t',
+			expected: true,
+		},
+		{
+			name:     "Numeric character",
+			s:        "abc123",
+			c:        '1',
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := containsChar(tt.s, tt.c)
+			if result != tt.expected {
+				t.Errorf("containsChar(%q, %q) = %v, want %v", tt.s, tt.c, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestExtractURLWithQueryParams tests URL extraction with various query parameters
+func TestExtractURLWithQueryParams(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "URL with single query param",
+			input:    "Link: https://example.com?foo=bar",
+			expected: "https://example.com?foo=bar",
+		},
+		{
+			name:     "URL with multiple query params",
+			input:    "Link: https://example.com?foo=bar&baz=qux&num=123",
+			expected: "https://example.com?foo=bar&baz=qux&num=123",
+		},
+		{
+			name:     "URL with encoded query param",
+			input:    "Link: https://example.com?q=hello%20world",
+			expected: "https://example.com?q=hello%20world",
+		},
+		{
+			name:     "URL with query and fragment",
+			input:    "Link: https://example.com?foo=bar#section",
+			expected: "https://example.com?foo=bar#section",
+		},
+		{
+			name:     "URL with empty query param value",
+			input:    "Link: https://example.com?foo=",
+			expected: "https://example.com?foo=",
+		},
+		{
+			name:     "URL with query param without value",
+			input:    "Link: https://example.com?flag",
+			expected: "https://example.com?flag",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractURL(tt.input)
+			if result != tt.expected {
+				t.Errorf("extractURL(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestExtractURLProtocols tests URL extraction with different protocols
+func TestExtractURLProtocols(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "HTTP protocol",
+			input:    "Visit http://example.com",
+			expected: "http://example.com",
+		},
+		{
+			name:     "HTTPS protocol",
+			input:    "Visit https://example.com",
+			expected: "https://example.com",
+		},
+		{
+			name:     "FTP protocol (not supported)",
+			input:    "Download ftp://files.example.com",
+			expected: "",
+		},
+		{
+			name:     "FILE protocol (not supported)",
+			input:    "Open file:///path/to/file",
+			expected: "",
+		},
+		{
+			name:     "MAILTO (not supported)",
+			input:    "Contact mailto:test@example.com",
+			expected: "",
+		},
+		{
+			name:     "SSH (not supported)",
+			input:    "Connect ssh://user@host.com",
+			expected: "",
+		},
+		{
+			name:     "Mixed case HTTP",
+			input:    "Visit HTTP://example.com",
+			expected: "",
+		},
+		{
+			name:     "Mixed case HTTPS",
+			input:    "Visit HTTPS://example.com",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractURL(tt.input)
+			if result != tt.expected {
+				t.Errorf("extractURL(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestURLRegexCompiled tests that the URL regex is properly compiled
+func TestURLRegexCompiled(t *testing.T) {
+	if urlRegex == nil {
+		t.Error("urlRegex is nil, expected to be compiled")
+	}
+}
+
+// TestGetOpinionVariousURLTypes tests getOpinion with different URL types
+func TestGetOpinionVariousURLTypes(t *testing.T) {
+	// Save original googleAPIKey and restore after test
+	originalKey := googleAPIKey
+	defer func() { googleAPIKey = originalKey }()
+	googleAPIKey = ""
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "GitHub URL",
+			input: "Check https://github.com/user/repo",
+		},
+		{
+			name:  "YouTube URL",
+			input: "Watch https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		},
+		{
+			name:  "Twitter URL",
+			input: "See https://twitter.com/user/status/123",
+		},
+		{
+			name:  "Medium URL",
+			input: "Read https://medium.com/@user/article",
+		},
+		{
+			name:  "Localhost URL",
+			input: "Test at http://localhost:3000/api",
+		},
+		{
+			name:  "IP address URL",
+			input: "Server at http://192.168.1.1:8080/admin",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, success := getOpinion(tt.input)
+
+			// Without API key, it should fail with tired message
+			if success {
+				t.Errorf("getOpinion(%q) with no API key: success = true, want false", tt.input)
+			}
+			if result != "I'm tired dude, next time 😴" {
+				t.Errorf("getOpinion(%q) = %q, want %q", tt.input, result, "I'm tired dude, next time 😴")
+			}
+		})
+	}
+}
+
+// TestProcessURLReturnsError tests processURL error handling
+func TestProcessURLReturnsError(t *testing.T) {
+	// Save original googleAPIKey and restore after test
+	originalKey := googleAPIKey
+	defer func() { googleAPIKey = originalKey }()
+	googleAPIKey = ""
+
+	urls := []string{
+		"https://example.com",
+		"https://github.com/test/repo",
+		"http://localhost:8080",
+		"https://api.example.com/v1/data",
+	}
+
+	for _, url := range urls {
+		t.Run(url, func(t *testing.T) {
+			result, success := processURL(url)
+
+			if success {
+				t.Errorf("processURL(%q) without API key: success = true, want false", url)
+			}
+			if result != "I'm tired dude, next time 😴" {
+				t.Errorf("processURL(%q) without API key = %q, want %q", url, result, "I'm tired dude, next time 😴")
+			}
+		})
+	}
+}
+
+// TestRefusalResponsesHaveEmojis tests that all refusal responses contain emojis
+func TestRefusalResponsesHaveEmojis(t *testing.T) {
+	// Common emoji patterns (expanded ranges)
+	hasEmoji := func(s string) bool {
+		for _, r := range s {
+			// Check for common emoji ranges
+			if r >= 0x1F600 && r <= 0x1F64F { // Emoticons
+				return true
+			}
+			if r >= 0x1F300 && r <= 0x1F5FF { // Misc Symbols and Pictographs
+				return true
+			}
+			if r >= 0x1F680 && r <= 0x1F6FF { // Transport and Map Symbols
+				return true
+			}
+			if r >= 0x1F900 && r <= 0x1F9FF { // Supplemental Symbols and Pictographs
+				return true
+			}
+			if r >= 0x1FA00 && r <= 0x1FA6F { // Chess Symbols
+				return true
+			}
+			if r >= 0x2600 && r <= 0x26FF { // Misc symbols
+				return true
+			}
+			if r >= 0x2700 && r <= 0x27BF { // Dingbats
+				return true
+			}
+		}
+		return false
+	}
+
+	// Test multiple times to check various responses
+	for i := 0; i < 50; i++ {
+		response := getRandomRefusalResponse()
+		if !hasEmoji(response) {
+			t.Errorf("getRandomRefusalResponse() = %q, expected to contain an emoji", response)
+		}
+	}
+}
