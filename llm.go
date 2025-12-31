@@ -19,7 +19,7 @@ type PromptType string
 const (
 	PromptBullshit PromptType = "bullshit" // 10%
 	PromptPositive PromptType = "positive" // 40%
-	PromptNegative PromptType = "negative" // 40%
+	PromptNegative PromptType = "negative" // 50%
 )
 
 // Base prompts for different tones
