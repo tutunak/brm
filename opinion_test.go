@@ -274,17 +274,17 @@ func TestExtractURLEdgeCases(t *testing.T) {
 		{
 			name:     "URL surrounded by parentheses",
 			input:    "Check this (https://example.com)",
-			expected: "https://example.com)",
+			expected: "https://example.com",
 		},
 		{
 			name:     "URL followed by punctuation",
 			input:    "Visit https://example.com.",
-			expected: "https://example.com.",
+			expected: "https://example.com",
 		},
 		{
 			name:     "URL in markdown format",
 			input:    "[Link](https://example.com)",
-			expected: "https://example.com)",
+			expected: "https://example.com",
 		},
 		{
 			name:     "Localhost URL",
@@ -295,6 +295,41 @@ func TestExtractURLEdgeCases(t *testing.T) {
 			name:     "IP address URL",
 			input:    "Server at http://192.168.1.1:8080",
 			expected: "http://192.168.1.1:8080",
+		},
+		{
+			name:     "URL followed by comma",
+			input:    "Visit https://example.com, then proceed",
+			expected: "https://example.com",
+		},
+		{
+			name:     "URL followed by exclamation mark",
+			input:    "Check out https://awesome-site.com!",
+			expected: "https://awesome-site.com",
+		},
+		{
+			name:     "URL followed by question mark",
+			input:    "Have you seen https://example.com?",
+			expected: "https://example.com",
+		},
+		{
+			name:     "URL followed by semicolon",
+			input:    "First https://example.com; then next",
+			expected: "https://example.com",
+		},
+		{
+			name:     "URL with multiple trailing punctuation",
+			input:    "Amazing site: https://example.com!.",
+			expected: "https://example.com",
+		},
+		{
+			name:     "URL in square brackets",
+			input:    "See [https://docs.example.com]",
+			expected: "https://docs.example.com",
+		},
+		{
+			name:     "URL in curly braces",
+			input:    "Template: {https://api.example.com}",
+			expected: "https://api.example.com",
 		},
 	}
 
