@@ -5,6 +5,8 @@ import (
 	"regexp"
 )
 
+var urlRegex = regexp.MustCompile(`https?://[^\s]+`)
+
 // getOpinion analyzes a message and returns an opinion about it
 // Returns the opinion and a boolean indicating if processing was successful
 func getOpinion(text string) (string, bool) {
@@ -27,7 +29,6 @@ func getOpinion(text string) (string, bool) {
 // extractURL extracts the first URL from the text
 func extractURL(text string) string {
 	// Regex to match URLs
-	urlRegex := regexp.MustCompile(`https?://[^\s]+`)
 	matches := urlRegex.FindStringSubmatch(text)
 	
 	if len(matches) > 0 {
