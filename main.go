@@ -172,13 +172,13 @@ func handleOpinionCommand(c tele.Context) error {
         
         // Count recent attempts
         count, err := redisClient.ZCount(ctx, rateLimitKey, fmt.Sprintf("%d", twoDaysAgo.Unix()), "+inf").Result()
-        if err == nil && count >= 20 {
+        if err == nil && count >= 5 {
             logJSON("warn", "Rate limit exceeded", map[string]interface{}{
                 "user":  getUserInfo(c),
                 "chat":  getChatInfo(c),
                 "count": count,
             })
-            return c.Reply("⚠️ You've reached the limit of 5 opinions per 2 days for new messages. Already analyzed messages can still be searched.")
+            return c.Reply("⚠️ You've reached the limit of 5 opinions per day for new messages. Already analyzed messages can still be searched.")
         }
         
         // Add current attempt to rate limit tracking
