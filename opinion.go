@@ -3,7 +3,6 @@ package main
 import (
 	"math/rand"
 	"regexp"
-	"time"
 )
 
 // getOpinion analyzes a message and returns an opinion about it
@@ -65,9 +64,6 @@ func getRandomRefusalResponse() string {
 		"I refuse 🚫",
 		"Absolutely not 😤",
 	}
-	
-	// Seed random number generator
-	rand.Seed(time.Now().UnixNano())
 	
 	return responses[rand.Intn(len(responses))]
 }
