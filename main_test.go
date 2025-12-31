@@ -183,7 +183,9 @@ func TestIsExcludedUser(t *testing.T) {
 			os.Setenv("EXCLUDED_USER_IDS", tt.envValue)
 			defer os.Unsetenv("EXCLUDED_USER_IDS")
 
-			result := isExcludedUser(tt.userID)
+			excludedUserIds := parseExcludedUserIDs(tt.envValue)
+
+			result := isExcludedUser(tt.userID, excludedUserIds)
 
 			if result != tt.expected {
 				t.Errorf("isExcludedUser(%d) with env=%q = %v, want %v", tt.userID, tt.envValue, result, tt.expected)
@@ -409,12 +411,14 @@ func TestIsAllowedChat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("ALLOWED_CHAT_IDS", tt.envValue)
 			defer os.Unsetenv("ALLOWED_CHAT_IDS")
+			
+			allowedChatIds := parseAllowedChatIDs(tt.envValue)
 
 			mockCtx := &MockContext{
 				chat: &tele.Chat{ID: tt.chatID},
 			}
 
-			result := isAllowedChat(mockCtx)
+			result := isAllowedChat(mockCtx, allowedChatIds)
 
 			if result != tt.expected {
 				t.Errorf("isAllowedChat() with chatID=%d and env=%q = %v, want %v",
@@ -832,8 +836,8 @@ func TestIsExcludedUserEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("EXCLUDED_USER_IDS", tt.envValue)
 			defer os.Unsetenv("EXCLUDED_USER_IDS")
-
-			result := isExcludedUser(tt.userID)
+			excludedUserIds := parseExcludedUserIDs(tt.envValue)
+			result := isExcludedUser(tt.userID, excludedUserIds)
 
 			if result != tt.expected {
 				t.Errorf("isExcludedUser(%d) with env=%q = %v, want %v", tt.userID, tt.envValue, result, tt.expected)
@@ -886,12 +890,12 @@ func TestIsAllowedChatEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("ALLOWED_CHAT_IDS", tt.envValue)
 			defer os.Unsetenv("ALLOWED_CHAT_IDS")
-
+			allowedChatIds := parseAllowedChatIDs(tt.envValue)
 			mockCtx := &MockContext{
 				chat: &tele.Chat{ID: tt.chatID},
 			}
 
-			result := isAllowedChat(mockCtx)
+			result := isAllowedChat(mockCtx, allowedChatIds)
 
 			if result != tt.expected {
 				t.Errorf("isAllowedChat() with chatID=%d and env=%q = %v, want %v",
@@ -1470,7 +1474,7 @@ func TestHandleOpinionCommandUnauthorizedChat(t *testing.T) {
 				},
 			}
 
-			err := handleOpinionCommand(mockCtx)
+			err := handleOpinionCommand(mockCtx, parseAllowedChatIDs(os.Getenv("ALLOWED_CHAT_IDS")), parseExcludedUserIDs(os.Getenv("EXCLUDED_USER_IDS")))
 
 			w.Close()
 			os.Stdout = oldStdout
@@ -1544,7 +1548,7 @@ func TestHandleOpinionCommandNoReply(t *testing.T) {
 		},
 	}
 
-	err := handleOpinionCommand(mockCtx)
+	err := handleOpinionCommand(mockCtx, parseAllowedChatIDs(os.Getenv("ALLOWED_CHAT_IDS")), parseExcludedUserIDs(os.Getenv("EXCLUDED_USER_IDS")))
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -1607,7 +1611,7 @@ func TestHandleOpinionCommandEmptyReplyText(t *testing.T) {
 		},
 	}
 
-	err := handleOpinionCommand(mockCtx)
+	err := handleOpinionCommand(mockCtx, parseAllowedChatIDs(os.Getenv("ALLOWED_CHAT_IDS")), parseExcludedUserIDs(os.Getenv("EXCLUDED_USER_IDS")))
 
 	w.Close()
 	os.Stdout = oldStdout
