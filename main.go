@@ -103,16 +103,16 @@ func main() {
     // Handle /opinion command
     bot.Handle("/opinion", func(c tele.Context) error {
         logRequest(c, "/opinion")
-        return handleOpinionCommand(c)
+        return handleOpinionCommand(c, allowedChatIDs, excludedUserIDs)
     })
 
     logJSON("info", "Bot is running and waiting for messages", nil)
     bot.Start()
 }
 
-func handleOpinionCommand(c tele.Context) error {
+func handleOpinionCommand(c tele.Context, allowedChatIDs []int64, excludedUserIDs []int64) error {
     // Check if in allowed group
-    if !isAllowedChat(c) {
+    if !isAllowedChat(c, allowedChatIDs) {
         chatType := string(c.Chat().Type)
         var message string
         
@@ -162,7 +162,7 @@ func handleOpinionCommand(c tele.Context) error {
     }
     
     // Rate limiting: only apply to NEW messages (not already processed) and non-excluded users
-    if !alreadyProcessed && redisClient != nil && !isExcludedUser(userID) {
+    if !alreadyProcessed && redisClient != nil && !isExcludedUser(userID, excludedUserIDs) {
         rateLimitKey := fmt.Sprintf("ratelimit:%d", userID)
         now := time.Now()
         timeRange := now.Add(-24 * time.Hour)
@@ -343,10 +343,7 @@ func parseAllowedChatIDs(chatsStr string) []int64 {
 }
 
 // isAllowedChat checks if the current chat is in the allowed list
-func isAllowedChat(c tele.Context) bool {
-    allowedChatsStr := os.Getenv("ALLOWED_CHAT_IDS")
-    allowedChatIDs := parseAllowedChatIDs(allowedChatsStr)
-    
+func isAllowedChat(c tele.Context, allowedChatIDs []int64) bool {    
     currentChatID := c.Chat().ID
     
     for _, allowedID := range allowedChatIDs {
@@ -414,10 +411,7 @@ func parseExcludedUserIDs(usersStr string) []int64 {
 }
 
 // isExcludedUser checks if the user is in the excluded list (bypasses rate limiting)
-func isExcludedUser(userID int64) bool {
-    excludedUsersStr := os.Getenv("EXCLUDED_USER_IDS")
-    excludedUserIDs := parseExcludedUserIDs(excludedUsersStr)
-    
+func isExcludedUser(userID int64, excludedUserIDs []int64) bool {
     for _, excludedID := range excludedUserIDs {
         if userID == excludedID {
             return true
