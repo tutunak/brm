@@ -44,19 +44,28 @@ func extractURL(text string) string {
 // trimTrailingPunctuation removes trailing punctuation characters that are
 // commonly not part of URLs (periods, commas, parentheses, brackets, etc.)
 func trimTrailingPunctuation(url string) string {
+	// Common punctuation marks that often appear after URLs in text
+	const trailingPunctuation = ".,)]};!?:"
+	
 	for len(url) > 0 {
 		lastChar := url[len(url)-1]
-		// Remove trailing: . , ) ] } ! ? ; :
-		// But keep these if they're part of valid URL patterns
-		if lastChar == '.' || lastChar == ',' || lastChar == ')' || 
-		   lastChar == ']' || lastChar == '}' || lastChar == '!' || 
-		   lastChar == '?' || lastChar == ';' || lastChar == ':' {
+		if containsChar(trailingPunctuation, lastChar) {
 			url = url[:len(url)-1]
 		} else {
 			break
 		}
 	}
 	return url
+}
+
+// containsChar checks if a string contains a specific byte character
+func containsChar(s string, c byte) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == c {
+			return true
+		}
+	}
+	return false
 }
 
 // processURL processes the URL (currently does nothing)
