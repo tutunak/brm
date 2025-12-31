@@ -32,10 +32,31 @@ func extractURL(text string) string {
 	matches := urlRegex.FindStringSubmatch(text)
 	
 	if len(matches) > 0 {
-		return matches[0]
+		url := matches[0]
+		// Trim common trailing punctuation that's not part of the URL
+		url = trimTrailingPunctuation(url)
+		return url
 	}
 	
 	return ""
+}
+
+// trimTrailingPunctuation removes trailing punctuation characters that are
+// commonly not part of URLs (periods, commas, parentheses, brackets, etc.)
+func trimTrailingPunctuation(url string) string {
+	for len(url) > 0 {
+		lastChar := url[len(url)-1]
+		// Remove trailing: . , ) ] } ! ? ; :
+		// But keep these if they're part of valid URL patterns
+		if lastChar == '.' || lastChar == ',' || lastChar == ')' || 
+		   lastChar == ']' || lastChar == '}' || lastChar == '!' || 
+		   lastChar == '?' || lastChar == ';' || lastChar == ':' {
+			url = url[:len(url)-1]
+		} else {
+			break
+		}
+	}
+	return url
 }
 
 // processURL processes the URL (currently does nothing)
