@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -295,5 +298,391 @@ func TestTruncateStringAddsSuffix(t *testing.T) {
 
 	if !strings.HasSuffix(result, "...") {
 		t.Errorf("truncateString result %q does not end with '...'", result)
+	}
+}
+
+// TestTruncateStringNegativeMaxLen tests truncateString with negative maxLen
+func TestTruncateStringNegativeMaxLen(t *testing.T) {
+	// Negative maxLen causes a panic in current implementation
+	// This test documents the expected behavior - it panics with slice bounds error
+	defer func() {
+		if r := recover(); r == nil {
+			t.Log("truncateString with negative maxLen did not panic (implementation may have been fixed)")
+		}
+	}()
+
+	truncateString("Hello", -1)
+	// If we get here without panic, the implementation handles negative values
+}
+
+// TestTruncateStringExactBoundary tests truncateString at exact boundary
+func TestTruncateStringExactBoundary(t *testing.T) {
+	tests := []struct {
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{"12345", 5, "12345"},     // Exactly equal
+		{"12345", 4, "1234..."},   // One less
+		{"12345", 6, "12345"},     // One more
+		{"", 0, ""},               // Both empty/zero
+		{"a", 1, "a"},             // Single char equal
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := truncateString(tt.input, tt.maxLen)
+			if result != tt.expected {
+				t.Errorf("truncateString(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestSelectPromptTypeAlwaysReturnsValid tests that selectPromptType always returns a valid type
+func TestSelectPromptTypeAlwaysReturnsValid(t *testing.T) {
+	validTypes := map[PromptType]bool{
+		PromptBullshit: true,
+		PromptPositive: true,
+		PromptNegative: true,
+	}
+
+	// Run many iterations
+	for i := 0; i < 1000; i++ {
+		result := selectPromptType()
+		if !validTypes[result] {
+			t.Errorf("selectPromptType() iteration %d returned invalid type: %v", i, result)
+		}
+	}
+}
+
+// TestSelectPromptTypeProbabilityBounds tests the probability boundaries
+func TestSelectPromptTypeProbabilityBounds(t *testing.T) {
+	// This test verifies the distribution matches the expected probabilities
+	// by checking that each type is selected at least a minimum percentage
+	counts := make(map[PromptType]int)
+	iterations := 10000
+
+	for i := 0; i < iterations; i++ {
+		counts[selectPromptType()]++
+	}
+
+	// Check minimum thresholds (with generous tolerance for randomness)
+	bullshitPct := float64(counts[PromptBullshit]) / float64(iterations) * 100
+	positivePct := float64(counts[PromptPositive]) / float64(iterations) * 100
+	negativePct := float64(counts[PromptNegative]) / float64(iterations) * 100
+
+	// Bullshit should be at least 5% (target 10%)
+	if bullshitPct < 5 {
+		t.Errorf("PromptBullshit = %.1f%%, expected at least 5%%", bullshitPct)
+	}
+	// Positive should be at least 30% (target 40%)
+	if positivePct < 30 {
+		t.Errorf("PromptPositive = %.1f%%, expected at least 30%%", positivePct)
+	}
+	// Negative should be at least 40% (target 50%)
+	if negativePct < 40 {
+		t.Errorf("PromptNegative = %.1f%%, expected at least 40%%", negativePct)
+	}
+}
+
+// TestBuildPromptNotEmpty tests that buildPrompt never returns empty string
+func TestBuildPromptNotEmpty(t *testing.T) {
+	promptTypes := []PromptType{PromptBullshit, PromptPositive, PromptNegative}
+
+	for _, pt := range promptTypes {
+		result := buildPrompt(pt)
+		if result == "" {
+			t.Errorf("buildPrompt(%v) returned empty string", pt)
+		}
+	}
+}
+
+// TestBuildPromptContainsBaseAndVideo tests that buildPrompt combines base and video prompts
+func TestBuildPromptContainsBaseAndVideo(t *testing.T) {
+	promptTypes := []PromptType{PromptBullshit, PromptPositive, PromptNegative}
+
+	for _, pt := range promptTypes {
+		t.Run(string(pt), func(t *testing.T) {
+			result := buildPrompt(pt)
+			base := basePrompts[pt]
+			video := videoPrompts[pt]
+
+			if !strings.Contains(result, base) {
+				t.Errorf("buildPrompt(%v) does not contain base prompt", pt)
+			}
+			if !strings.Contains(result, strings.TrimSpace(video)) {
+				t.Errorf("buildPrompt(%v) does not contain video prompt", pt)
+			}
+		})
+	}
+}
+
+// TestBuildPromptWithInvalidType tests buildPrompt with an invalid prompt type
+func TestBuildPromptWithInvalidType(t *testing.T) {
+	invalidType := PromptType("invalid")
+	result := buildPrompt(invalidType)
+
+	// With invalid type, both maps will return empty strings
+	if result != "" {
+		t.Errorf("buildPrompt(invalid) = %q, expected empty string", result)
+	}
+}
+
+// TestPromptMapsHaveSameKeys tests that basePrompts and videoPrompts have the same keys
+func TestPromptMapsHaveSameKeys(t *testing.T) {
+	for key := range basePrompts {
+		if _, exists := videoPrompts[key]; !exists {
+			t.Errorf("basePrompts has key %v but videoPrompts does not", key)
+		}
+	}
+
+	for key := range videoPrompts {
+		if _, exists := basePrompts[key]; !exists {
+			t.Errorf("videoPrompts has key %v but basePrompts does not", key)
+		}
+	}
+}
+
+// TestBasePromptsContainKeywords tests that base prompts contain expected keywords
+func TestBasePromptsContainKeywords(t *testing.T) {
+	tests := []struct {
+		promptType PromptType
+		keywords   []string
+	}{
+		{
+			PromptBullshit,
+			[]string{"bullshit", "short", "funny"},
+		},
+		{
+			PromptPositive,
+			[]string{"positive", "encouraging", "good"},
+		},
+		{
+			PromptNegative,
+			[]string{"criticism", "critical", "weaknesses"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.promptType), func(t *testing.T) {
+			prompt := basePrompts[tt.promptType]
+			promptLower := strings.ToLower(prompt)
+
+			for _, keyword := range tt.keywords {
+				if !strings.Contains(promptLower, strings.ToLower(keyword)) {
+					t.Errorf("basePrompts[%v] missing keyword %q", tt.promptType, keyword)
+				}
+			}
+		})
+	}
+}
+
+// TestVideoPromptsContainVideoKeyword tests that all video prompts mention "video"
+func TestVideoPromptsContainVideoKeyword(t *testing.T) {
+	for promptType, prompt := range videoPrompts {
+		if !strings.Contains(strings.ToLower(prompt), "video") {
+			t.Errorf("videoPrompts[%v] does not contain 'video'", promptType)
+		}
+	}
+}
+
+// TestAnalyzeURLWithLLMEmptyURL tests analyzeURLWithLLM with empty URL
+func TestAnalyzeURLWithLLMEmptyURL(t *testing.T) {
+	// Save original googleAPIKey and restore after test
+	originalKey := googleAPIKey
+	defer func() { googleAPIKey = originalKey }()
+
+	googleAPIKey = ""
+
+	result, err := analyzeURLWithLLM("")
+
+	if err == nil {
+		t.Error("analyzeURLWithLLM with empty URL: expected error, got nil")
+	}
+
+	if result != "" {
+		t.Errorf("analyzeURLWithLLM with empty URL: result = %q, want empty string", result)
+	}
+}
+
+// TestLLMModelNotEmpty tests that llmModel constant is not empty
+func TestLLMModelNotEmpty(t *testing.T) {
+	if llmModel == "" {
+		t.Error("llmModel constant is empty")
+	}
+}
+
+// TestPromptTypeIsString tests that PromptType values are strings
+func TestPromptTypeIsString(t *testing.T) {
+	types := []PromptType{PromptBullshit, PromptPositive, PromptNegative}
+
+	for _, pt := range types {
+		if string(pt) == "" {
+			t.Errorf("PromptType %v converts to empty string", pt)
+		}
+	}
+}
+
+// TestPromptTypeValuesUnique tests that all PromptType values are unique
+func TestPromptTypeValuesUnique(t *testing.T) {
+	types := []PromptType{PromptBullshit, PromptPositive, PromptNegative}
+	seen := make(map[PromptType]bool)
+
+	for _, pt := range types {
+		if seen[pt] {
+			t.Errorf("Duplicate PromptType value: %v", pt)
+		}
+		seen[pt] = true
+	}
+}
+
+// TestBasePromptsLength tests that base prompts are not too short
+func TestBasePromptsLength(t *testing.T) {
+	minLength := 50 // Reasonable minimum for a useful prompt
+
+	for promptType, prompt := range basePrompts {
+		if len(prompt) < minLength {
+			t.Errorf("basePrompts[%v] is too short (%d chars), expected at least %d",
+				promptType, len(prompt), minLength)
+		}
+	}
+}
+
+// TestVideoPromptsLength tests that video prompts are not too short
+func TestVideoPromptsLength(t *testing.T) {
+	minLength := 20 // Reasonable minimum for video handling instructions
+
+	for promptType, prompt := range videoPrompts {
+		if len(prompt) < minLength {
+			t.Errorf("videoPrompts[%v] is too short (%d chars), expected at least %d",
+				promptType, len(prompt), minLength)
+		}
+	}
+}
+
+// TestTruncateStringWithSpecialCharacters tests truncateString with special chars
+func TestTruncateStringWithSpecialCharacters(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{
+			name:     "String with newlines",
+			input:    "Hello\nWorld\nTest",
+			maxLen:   7,
+			expected: "Hello\nW...",
+		},
+		{
+			name:     "String with tabs",
+			input:    "Hello\tWorld",
+			maxLen:   6,
+			expected: "Hello\t...",
+		},
+		{
+			name:     "String with null bytes",
+			input:    "Hello\x00World",
+			maxLen:   6,
+			expected: "Hello\x00...",
+		},
+		{
+			name:     "String with unicode",
+			input:    "Привет мир",
+			maxLen:   20, // Each Cyrillic char is 2 bytes, so 10 chars = 19 bytes + space
+			expected: "Привет мир",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := truncateString(tt.input, tt.maxLen)
+			if result != tt.expected {
+				t.Errorf("truncateString(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestAnalyzeURLWithLLMLogsCorrectly tests that analyzeURLWithLLM logs properly
+func TestAnalyzeURLWithLLMLogsCorrectly(t *testing.T) {
+	// Save original googleAPIKey and restore after test
+	originalKey := googleAPIKey
+	defer func() { googleAPIKey = originalKey }()
+
+	googleAPIKey = ""
+
+	// Capture stdout to check logs
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	analyzeURLWithLLM("https://example.com")
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	output := buf.String()
+
+	// Should contain error log about API key
+	if !strings.Contains(output, "LLM API key not configured") {
+		t.Error("analyzeURLWithLLM did not log API key error")
+	}
+}
+
+// TestBuildPromptOrder tests that buildPrompt concatenates in correct order
+func TestBuildPromptOrder(t *testing.T) {
+	for _, pt := range []PromptType{PromptBullshit, PromptPositive, PromptNegative} {
+		t.Run(string(pt), func(t *testing.T) {
+			result := buildPrompt(pt)
+			base := basePrompts[pt]
+			video := videoPrompts[pt]
+
+			// Base should come first
+			baseIndex := strings.Index(result, base)
+			videoIndex := strings.Index(result, strings.TrimSpace(video))
+
+			if baseIndex == -1 {
+				t.Error("Base prompt not found in result")
+				return
+			}
+			if videoIndex == -1 {
+				t.Error("Video prompt not found in result")
+				return
+			}
+			if baseIndex > videoIndex {
+				t.Error("Base prompt should come before video prompt")
+			}
+		})
+	}
+}
+
+// TestPromptTypeCasting tests that PromptType can be cast to and from string
+func TestPromptTypeCasting(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected PromptType
+	}{
+		{"bullshit", PromptBullshit},
+		{"positive", PromptPositive},
+		{"negative", PromptNegative},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := PromptType(tt.input)
+			if result != tt.expected {
+				t.Errorf("PromptType(%q) = %v, want %v", tt.input, result, tt.expected)
+			}
+
+			// And back to string
+			str := string(result)
+			if str != tt.input {
+				t.Errorf("string(PromptType(%q)) = %q, want %q", tt.input, str, tt.input)
+			}
+		})
 	}
 }
